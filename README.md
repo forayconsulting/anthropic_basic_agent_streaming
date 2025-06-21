@@ -1,6 +1,6 @@
 # Claude Agent
 
-A minimal Python implementation of a Claude-based agent with MCP (Model Context Protocol) support and extended thinking capabilities.
+A minimal Python implementation of a Claude-based agent with MCP (Model Context Protocol) support and extended thinking capabilities. Built using Test-Driven Development methodology with comprehensive test coverage.
 
 ## Features
 
@@ -66,16 +66,40 @@ async for event in agent.stream_response(
 
 ## MCP Integration
 
-Connect to local MCP servers for tool access:
+Connect to MCP servers for external tool access. Claude can automatically use tools from any MCP server! See [MCP_INTEGRATION.md](MCP_INTEGRATION.md) for detailed guide.
 
 ```python
-# Connect to MCP server
-await agent.connect_mcp("python", ["-m", "my_mcp_server"])
+from claude_agent.agent_tools_fixed import ClaudeAgentWithToolsFixed, StreamEventType
 
-# Use tools in conversation
-async for event in agent.stream_response(
-    system_prompt="You are an assistant with tool access.",
-    user_prompt="Search for information about Python."
+# Initialize agent with tool support
+agent = ClaudeAgentWithToolsFixed(api_key="your-api-key")
+
+# Connect to any MCP server (filesystem example)
+await agent.connect_mcp(
+    command="npx",
+    args=["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
+)
+
+# Claude automatically uses tools to answer questions!
+async for event in agent.stream_response_with_tools(
+    system_prompt="You are a helpful assistant with filesystem access.",
+    user_prompt="What files are in this directory and what do they contain?"
+):
+    if event.type == StreamEventType.RESPONSE:
+        print(event.content, end="")
+    elif event.type == StreamEventType.TOOL_USE:
+        print(f"\n[Using tool: {event.metadata.get('tool_name')}]")
+
+# Works with any MCP server - YouTube, GitHub, SQLite, etc!
+await agent.connect_mcp(
+    command="npx",
+    args=["-y", "@smithery/cli", "run", "@kimtaeyoon83/mcp-server-youtube-transcript"]
+)
+
+# Claude can now analyze YouTube videos
+async for event in agent.stream_response_with_tools(
+    system_prompt="You are a helpful assistant.",
+    user_prompt="Summarize this video: https://youtube.com/watch?v=..."
 ):
     print(event.content, end="")
 

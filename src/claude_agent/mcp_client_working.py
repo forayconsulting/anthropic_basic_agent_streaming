@@ -1,9 +1,9 @@
-"""MCP (Model Context Protocol) client wrapper."""
+"""Working MCP client implementation."""
 
-from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
 import asyncio
-import os
+from dataclasses import dataclass
+from typing import Dict, Any, List, Optional, Tuple
+from contextlib import asynccontextmanager
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -26,11 +26,11 @@ class MCPResource:
     mime_type: Optional[str] = None
 
 
-class MCPClientWrapper:
-    """Wrapper for MCP client with stdio transport."""
+class WorkingMCPClient:
+    """MCP client that properly handles async context managers."""
     
     def __init__(self) -> None:
-        """Initialize the MCP client wrapper."""
+        """Initialize the MCP client."""
         self._session: Optional[ClientSession] = None
         self._stdio_task: Optional[asyncio.Task] = None
         self._tools: List[MCPTool] = []
@@ -45,7 +45,7 @@ class MCPClientWrapper:
     async def connect_stdio(
         self,
         command: str,
-        args: List[str],
+        args: Optional[List[str]] = None,
         env: Optional[Dict[str, str]] = None,
         cwd: Optional[str] = None
     ) -> None:
@@ -72,14 +72,14 @@ class MCPClientWrapper:
         # Start the stdio connection in a background task
         self._stdio_task = asyncio.create_task(self._run_stdio_connection())
         
-        # Wait for connection to be established with timeout
+        # Wait for connection to be established
         retries = 0
-        while not self._session and retries < 100:  # 10 seconds timeout
+        while not self._session and retries < 50:  # 5 seconds timeout
             await asyncio.sleep(0.1)
             retries += 1
         
         if not self._session:
-            raise TimeoutError("Failed to establish MCP connection after 10 seconds")
+            raise TimeoutError("Failed to establish MCP connection")
     
     async def _run_stdio_connection(self) -> None:
         """Run the stdio connection in the background."""

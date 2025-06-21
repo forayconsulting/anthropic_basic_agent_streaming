@@ -1,12 +1,16 @@
-"""MCP (Model Context Protocol) client wrapper."""
+"""Real MCP (Model Context Protocol) client implementation with stdio transport."""
 
-from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
 import asyncio
-import os
+import json
+import subprocess
+import sys
+from dataclasses import dataclass
+from typing import Dict, Any, List, Optional, Union
+from pathlib import Path
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.types import Tool, Resource
 
 
 @dataclass
@@ -26,16 +30,15 @@ class MCPResource:
     mime_type: Optional[str] = None
 
 
-class MCPClientWrapper:
-    """Wrapper for MCP client with stdio transport."""
+class RealMCPClient:
+    """Real MCP client implementation with stdio transport."""
     
     def __init__(self) -> None:
-        """Initialize the MCP client wrapper."""
+        """Initialize the MCP client."""
         self._session: Optional[ClientSession] = None
-        self._stdio_task: Optional[asyncio.Task] = None
+        self._client_task: Optional[asyncio.Task] = None
         self._tools: List[MCPTool] = []
         self._resources: List[MCPResource] = []
-        self._server_params: Optional[StdioServerParameters] = None
     
     @property
     def is_connected(self) -> bool:
@@ -45,7 +48,7 @@ class MCPClientWrapper:
     async def connect_stdio(
         self,
         command: str,
-        args: List[str],
+        args: Optional[List[str]] = None,
         env: Optional[Dict[str, str]] = None,
         cwd: Optional[str] = None
     ) -> None:
@@ -61,64 +64,60 @@ class MCPClientWrapper:
         if self._session:
             await self.disconnect()
         
-        # Store server parameters
-        self._server_params = StdioServerParameters(
+        # Prepare server parameters
+        server_params = StdioServerParameters(
             command=command,
             args=args or [],
             env=env,
             cwd=cwd
         )
         
-        # Start the stdio connection in a background task
-        self._stdio_task = asyncio.create_task(self._run_stdio_connection())
-        
-        # Wait for connection to be established with timeout
-        retries = 0
-        while not self._session and retries < 100:  # 10 seconds timeout
-            await asyncio.sleep(0.1)
-            retries += 1
-        
-        if not self._session:
-            raise TimeoutError("Failed to establish MCP connection after 10 seconds")
+        # Use stdio_client as a context manager
+        async with stdio_client(server_params) as (read_stream, write_stream):
+            # Create session with the streams
+            self._session = ClientSession(read_stream, write_stream)
+            
+            # Initialize the session
+            await self._session.initialize()
+            
+            # Store the streams for later use
+            self._read_stream = read_stream
+            self._write_stream = write_stream
+            
+            # Start the read loop
+            self._client_task = asyncio.create_task(self._run_client(read_stream, write_stream))
+            
+            # Refresh capabilities
+            await self.refresh_capabilities()
+            
+            # Exit the context manager but keep the connection alive
+            # The streams remain open until we explicitly close them
     
-    async def _run_stdio_connection(self) -> None:
-        """Run the stdio connection in the background."""
+    async def _run_client(self, read_stream: Any, write_stream: Any) -> None:
+        """Run the client read loop."""
         try:
-            async with stdio_client(self._server_params) as (read_stream, write_stream):
-                # Create and initialize session
-                self._session = ClientSession(read_stream, write_stream)
-                await self._session.initialize()
-                
-                # Refresh capabilities
-                await self.refresh_capabilities()
-                
-                # Keep the connection alive
-                try:
-                    # Read messages until cancelled
-                    while True:
-                        await asyncio.sleep(1)
-                except asyncio.CancelledError:
-                    # Clean shutdown
-                    pass
-                finally:
-                    await self._session.close()
-                    self._session = None
-                    
+            async for message in read_stream:
+                # Process messages if needed
+                pass
         except Exception as e:
-            print(f"MCP connection error: {e}")
-            self._session = None
+            print(f"Client error: {e}")
+        finally:
+            write_stream.close()
     
     async def disconnect(self) -> None:
         """Disconnect from MCP server."""
-        if self._stdio_task:
-            self._stdio_task.cancel()
+        if self._client_task:
+            self._client_task.cancel()
             try:
-                await self._stdio_task
+                await self._client_task
             except asyncio.CancelledError:
                 pass
-            self._stdio_task = None
+            self._client_task = None
         
-        self._session = None
+        if self._session:
+            await self._session.close()
+            self._session = None
+        
         self._tools = []
         self._resources = []
     

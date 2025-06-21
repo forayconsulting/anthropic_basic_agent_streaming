@@ -8,6 +8,11 @@ from .api_request_builder import APIRequestBuilder
 from .sse_parser import SSEParser, SSEEvent
 from .token_classifier import TokenClassifier, TokenType, ClassifiedToken
 
+# New MCP integration classes
+from .mcp_client_fixed import FixedMCPClient, MCPConnectionManager
+from .mcp_anthropic_bridge import MCPAnthropicBridge, AnthropicToolUse, AnthropicToolResult, ToolExecutor
+from .agent_with_tools import ClaudeAgentWithTools
+
 __all__ = [
     "ClaudeAgent",
     "StreamEvent",
@@ -21,4 +26,12 @@ __all__ = [
     "TokenClassifier",
     "TokenType",
     "ClassifiedToken",
+    # New MCP integration
+    "FixedMCPClient",
+    "MCPConnectionManager",
+    "MCPAnthropicBridge",
+    "AnthropicToolUse",
+    "AnthropicToolResult",
+    "ToolExecutor",
+    "ClaudeAgentWithTools",
 ]
