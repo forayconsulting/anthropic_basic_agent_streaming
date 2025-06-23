@@ -172,6 +172,7 @@ class ChatHandler(BaseHTTPRequestHandler):
         response_parts = []
         
         try:
+            logger.info("Starting stream_response")
             async for event in agent.stream_response(
                 system_prompt=session['system_prompt'],
                 user_prompt=message,
@@ -188,6 +189,8 @@ class ChatHandler(BaseHTTPRequestHandler):
                 elif event.type == StreamEventType.ERROR:
                     self._send_sse_event("error", event.content)
             
+            logger.info("Stream loop completed - updating conversation history")
+            
             # Update conversation history
             session['conversation_history'].append({"role": "user", "content": message})
             if response_parts:
@@ -202,7 +205,7 @@ class ChatHandler(BaseHTTPRequestHandler):
             logger.info("Stream completed successfully")
             
         except Exception as e:
-            logger.error(f"Error in streaming: {e}")
+            logger.error(f"Error in streaming: {e}", exc_info=True)
             self._send_sse_event("error", str(e))
     
     def handle_mcp_connect(self, data: Dict[str, Any]):

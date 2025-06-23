@@ -4,11 +4,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import AsyncGenerator, Dict, Any, List, Optional
 import httpx
+import logging
 
 from .sse_parser import SSEParser
 from .token_classifier import TokenClassifier
 from .mcp_client import MCPClientWrapper
 from .api_request_builder import APIRequestBuilder
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class StreamEventType(Enum):
@@ -121,13 +125,12 @@ class ClaudeAgent:
                 timeout=httpx.Timeout(300.0)  # 5 minute timeout
             ) as response:
                 # Process SSE stream
+                stream_complete = False
                 async for chunk in response.aiter_bytes():
                     # Parse SSE events
                     for sse_event in self._sse_parser.parse(chunk):
                         # Debug log all events
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.debug(f"SSE event: {sse_event.event}, data keys: {list(sse_event.data.keys()) if sse_event.data else 'None'}")
+                        logger.info(f"SSE event: {sse_event.event}, data keys: {list(sse_event.data.keys()) if sse_event.data else 'None'}")
                         
                         # Handle error events
                         if sse_event.event == "error":
@@ -142,6 +145,7 @@ class ClaudeAgent:
                         # Handle message stop event - signals end of message
                         if sse_event.event == "message_stop":
                             logger.debug("Received message_stop event - stream complete")
+                            stream_complete = True
                             break
                         
                         # Skip ping events (keepalive)
@@ -163,3 +167,15 @@ class ClaudeAgent:
                                 content=token.content,
                                 metadata=token.metadata
                             )
+                    
+                    # Break outer loop if stream is complete
+                    if stream_complete:
+                        logger.info("Breaking outer loop - stream complete")
+                        break
+                
+                # After the loop, check if there's any remaining data in the buffer
+                logger.info("Checking for remaining data in SSE parser buffer")
+                for sse_event in self._sse_parser.parse(b""):  # Flush buffer
+                    logger.info(f"Final SSE event: {sse_event.event}")
+                    if sse_event.event == "message_stop":
+                        logger.info("Found message_stop in final buffer flush")
