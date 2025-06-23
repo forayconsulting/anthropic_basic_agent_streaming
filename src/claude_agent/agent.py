@@ -139,6 +139,16 @@ class ClaudeAgent:
                             )
                             continue
                         
+                        # Handle message stop event - signals end of message
+                        if sse_event.event == "message_stop":
+                            logger.debug("Received message_stop event - stream complete")
+                            break
+                        
+                        # Skip ping events (keepalive)
+                        if sse_event.event == "ping":
+                            logger.debug("Received ping event")
+                            continue
+                        
                         # Classify tokens
                         for token in self._token_classifier.classify(sse_event):
                             # Map token type to stream event type

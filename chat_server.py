@@ -197,7 +197,9 @@ class ChatHandler(BaseHTTPRequestHandler):
                 })
             
             # Send done event
+            logger.info("Sending done event")
             self._send_sse_event("done", "")
+            logger.info("Stream completed successfully")
             
         except Exception as e:
             logger.error(f"Error in streaming: {e}")
