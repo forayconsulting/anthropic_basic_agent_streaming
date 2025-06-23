@@ -4,114 +4,164 @@ A lightweight web-based chat interface for testing and interacting with the Clau
 
 ## Features
 
-- **BYOK (Bring Your Own Key)**: Enter your Anthropic API key directly in the interface
-- **Real-time Streaming**: See Claude's responses as they're generated
-- **Extended Thinking Mode**: Toggle and configure Claude's thinking process
-- **MCP Server Integration**: Connect to Model Context Protocol servers
-- **Conversation History**: Full chat history with export functionality
-- **Settings Persistence**: Saves your preferences in browser local storage
+- 🔑 **BYOK (Bring Your Own Key)**: Enter your Anthropic API key directly in the interface
+- 💬 **Real-time Streaming**: See responses as they're generated with a ChatGPT-like streaming cursor
+- 🧠 **Extended Thinking Mode**: Support for Claude's thinking process with collapsible sections
+- 🔧 **MCP Server Integration**: Connect to any MCP server directly from the UI
+- 📝 **Conversation History**: Full multi-turn conversations with context preservation
+- 💾 **Persistent Settings**: Your preferences are saved in browser local storage
+- 📤 **Export Conversations**: Export your chat history as JSON
 
-## Quick Start
+## Getting Started
 
-1. **Ensure you're in the virtual environment**:
-   ```bash
-   source venv/bin/activate
-   ```
+### Running the Chat Interface
 
-2. **Run the chat interface**:
-   ```bash
-   python run_chat.py
-   ```
-   
-   This will:
-   - Start the server on http://localhost:8080
-   - Automatically open your browser
-   - Display the chat interface
+```bash
+# Method 1: Using the launcher script (recommended)
+python run_chat.py
 
-3. **Configure and Connect**:
-   - Enter your Anthropic API key
-   - Click "Connect"
-   - Start chatting!
+# Method 2: Running the server directly
+python chat_server.py --port 8080
+```
 
-## Usage
+The interface will open automatically in your default browser at `http://localhost:8080`.
 
-### Basic Chat
-1. Enter your API key and click "Connect"
-2. Type messages in the input area
-3. Press Enter or click Send
+### Initial Setup
 
-### Settings
-- **System Prompt**: Customize Claude's behavior
-- **Thinking Budget**: Enable extended thinking (1024-128000 tokens)
-- **Max Tokens**: Set response length limit
-- **Show Thinking**: Toggle visibility of Claude's thinking process
+1. **Enter your API Key**: Paste your Anthropic API key in the sidebar
+2. **Click Connect**: This establishes a session with the server
+3. **Start Chatting**: Type your message and press Enter or click Send
+
+## Interface Overview
+
+### Sidebar Settings
+
+- **API Key**: Your Anthropic API key (stored locally in browser)
+- **System Prompt**: Customize Claude's behavior and role
+- **Thinking Budget**: Optional tokens for extended thinking (leave empty to disable)
+- **Max Tokens**: Maximum response length (default: 4096)
+- **Show Thinking Process**: Toggle to see Claude's thinking in collapsible sections
 
 ### MCP Server Connection
-1. Enter MCP server command (e.g., `python -m my_mcp_server`)
-2. Click "Connect" in the MCP section
-3. Claude can now use tools provided by the MCP server
 
-### Additional Options
-- **Clear Chat**: Remove all messages
-- **Export**: Download conversation as JSON
+1. Enter your MCP server command (e.g., `python -m my_mcp_server`)
+2. Click Connect to establish MCP connection
+3. Claude will automatically have access to the MCP server's tools
+4. The connection status and available context will be displayed
 
-## Command Line Options
+### Chat Features
 
-```bash
-python run_chat.py --help
-```
+- **Streaming Responses**: Responses appear in real-time with a blinking cursor
+- **Thinking Sections**: When thinking is enabled, see Claude's reasoning process
+  - Auto-collapses when the response begins
+  - Click to expand/collapse at any time
+  - Shows word count when complete
+- **Message History**: Full conversation context is maintained
+- **Clear Chat**: Start a fresh conversation
+- **Export**: Download your conversation as JSON
 
-Options:
-- `--port PORT`: Run on a different port (default: 8080)
-- `--no-browser`: Don't open browser automatically
-- `--host HOST`: Bind to specific host (default: localhost)
+## Technical Details
 
-## Testing
-
-Run the test suite:
-```bash
-# Unit tests for server methods
-python test_chat_methods.py
-
-# Integration tests (requires httpx)
-python test_chat_integration.py
-
-# Client-side tests
-open test_chat_interface.html
-```
-
-## Architecture
+### Architecture
 
 The chat interface consists of three main components:
 
-1. **chat_server.py**: Minimal HTTP server that wraps the Claude Agent
-2. **chat_interface.html**: Self-contained web interface with embedded CSS/JS
-3. **run_chat.py**: Launcher script for easy startup
+1. **chat_server.py**: HTTP server that wraps the Claude Agent
+   - Handles API sessions and state management
+   - Provides SSE (Server-Sent Events) for streaming
+   - Manages MCP connections per session
 
-The implementation follows a minimal design philosophy:
-- No external web framework (uses Python's built-in HTTP server)
-- Single HTML file with embedded styles and scripts
-- Direct integration with existing Claude Agent implementation
+2. **chat_interface.html**: Single-file web interface
+   - No external dependencies (pure HTML/CSS/JS)
+   - Responsive design with collapsible sidebar
+   - Real-time SSE event handling
+
+3. **run_chat.py**: Launcher script
+   - Starts the server
+   - Opens the browser automatically
+   - Handles graceful shutdown
+
+### API Endpoints
+
+- `GET /`: Serves the HTML interface
+- `POST /api/session`: Create/update session with API key
+- `POST /api/chat`: Stream chat responses (SSE)
+- `POST /api/mcp/connect`: Connect to MCP server
+- `POST /api/mcp/disconnect`: Disconnect from MCP server
+- `POST /api/mcp/status`: Get MCP connection status
+
+### Conversation History
+
+The interface maintains full conversation history:
+- Each message includes role (user/assistant) and content
+- History is sent with each new message for context
+- Exported conversations include all messages and settings
+
+### Extended Thinking Mode
+
+When thinking budget is set:
+- Claude uses additional tokens for reasoning
+- Thinking appears in blue collapsible sections
+- Sections auto-collapse when response begins
+- Useful for complex problems requiring step-by-step reasoning
+
+## Examples
+
+### Basic Conversation
+```
+You: What is the capital of France?
+Claude: The capital of France is Paris.
+```
+
+### With Extended Thinking
+```
+You: Solve this step by step: If a train travels 120 miles in 2 hours, and then 180 miles in 3 hours, what is its average speed?
+Claude: [Thinking: Let me calculate this step by step...]
+The average speed is 60 miles per hour.
+```
+
+### With MCP Tools
+```
+MCP Command: npx -y @modelcontextprotocol/server-filesystem /Users/me/documents
+You: What files are in my documents folder?
+Claude: I can see the following files in your documents folder...
+```
 
 ## Troubleshooting
 
-### Server won't start
-- Check if port 8080 is already in use
-- Try a different port: `python run_chat.py --port 8081`
+### Connection Issues
+- Ensure the server is running on the correct port
+- Check that your API key is valid
+- Look for error messages in the browser console
 
-### Connection fails
-- Verify your API key is correct
-- Check server logs in the terminal
-- Ensure you're using a valid Anthropic API key
+### Streaming Not Working
+- Verify your browser supports Server-Sent Events
+- Check for proxy or firewall interference
+- Try a different browser
 
-### MCP connection issues
-- Verify the MCP server command is correct
-- Check that the MCP server is installed
-- Look for error messages in the terminal
+### MCP Connection Failed
+- Ensure the MCP server command is correct
+- Check that required dependencies are installed
+- Look at server logs for detailed error messages
 
-## Security Notes
+## Development
 
-- API keys are stored in browser local storage
-- Never share or commit your API key
-- The server only accepts connections from localhost by default
-- For production use, implement proper authentication and HTTPS
+### Running Tests
+```bash
+# Test the chat server
+pytest test_chat_server.py -v
+
+# Test with coverage
+pytest test_chat_*.py --cov=chat_server
+```
+
+### Modifying the Interface
+- All UI code is in `chat_interface.html`
+- Server logic is in `chat_server.py`
+- No build process required - just refresh the browser
+
+### Adding Features
+The interface is designed to be minimal and extensible:
+- Add new API endpoints in `chat_server.py`
+- Update the UI in `chat_interface.html`
+- Follow the existing patterns for consistency

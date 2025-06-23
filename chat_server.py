@@ -133,9 +133,11 @@ class ChatHandler(BaseHTTPRequestHandler):
             session['thinking_budget'] = data['thinking_budget']
         if 'max_tokens' in data:
             session['max_tokens'] = data['max_tokens']
+        if 'conversation_history' in data:
+            session['conversation_history'] = data['conversation_history']
         
         # Debug log
-        logger.info(f"Chat request - thinking_budget: {session['thinking_budget']}, max_tokens: {session['max_tokens']}")
+        logger.info(f"Chat request - thinking_budget: {session['thinking_budget']}, max_tokens: {session['max_tokens']}, history_length: {len(session['conversation_history'])}")
         
         # Set up SSE response
         self.send_response(200)
