@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Interface Tests</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .pass { background: #e8f5e9; }
+        .fail { background: #ffebee; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Chat Interface Tests</h1>
+    <div id="test-results"></div>
+
+    <script>
+        // Test framework
+        const tests = [];
+        const results = document.getElementById('test-results');
+        
+        function test(name, fn) {
+            tests.push({ name, fn });
+        }
+        
+        async function runTests() {
+            results.innerHTML = '';
+            let passed = 0;
+            let failed = 0;
+            
+            for (const t of tests) {
+                const div = document.createElement('div');
+                div.className = 'test';
+                
+                try {
+                    await t.fn();
+                    div.className += ' pass';
+                    div.innerHTML = `<span class="success">✓</span> ${t.name}`;
+                    passed++;
+                } catch (error) {
+                    div.className += ' fail';
+                    div.innerHTML = `<span class="error">✗</span> ${t.name}<br><span class="error">${error.message}</span>`;
+                    failed++;
+                }
+                
+                results.appendChild(div);
+            }
+            
+            const summary = document.createElement('div');
+            summary.style.marginTop = '20px';
+            summary.innerHTML = `<strong>Total: ${tests.length}, Passed: ${passed}, Failed: ${failed}</strong>`;
+            results.appendChild(summary);
+        }
+        
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+        
+        function assertEquals(actual, expected, message) {
+            if (actual !== expected) {
+                throw new Error(message || `Expected ${expected}, got ${actual}`);
+            }
+        }
+        
+        // Mock functions from the actual interface
+        const ChatAPI = {
+            baseUrl: 'http://localhost:8080',
+            sessionId: null,
+            
+            async createSession(apiKey) {
+                // Mock implementation
+                if (!apiKey) throw new Error('API key required');
+                this.sessionId = 'mock-session-id';
+                return { session_id: this.sessionId };
+            },
+            
+            async sendMessage(message, settings = {}) {
+                // Mock implementation
+                if (!this.sessionId) throw new Error('No session');
+                return new EventSource('data:text/event-stream,event: response\ndata: "Hello"\n\nevent: done\ndata: ""\n\n');
+            },
+            
+            async connectMCP(command, args = []) {
+                // Mock implementation
+                if (!this.sessionId) throw new Error('No session');
+                if (!command) throw new Error('Command required');
+                return { status: 'connected', context: 'Mock MCP context' };
+            },
+            
+            async disconnectMCP() {
+                // Mock implementation
+                if (!this.sessionId) throw new Error('No session');
+                return { status: 'disconnected' };
+            },
+            
+            async getMCPStatus() {
+                // Mock implementation
+                if (!this.sessionId) throw new Error('No session');
+                return { connected: false, status: 'disconnected' };
+            }
+        };
+        
+        // Tests for ChatAPI
+        test('ChatAPI.createSession requires API key', async () => {
+            try {
+                await ChatAPI.createSession('');
+                assert(false, 'Should have thrown error');
+            } catch (e) {
+                assert(e.message === 'API key required');
+            }
+        });
+        
+        test('ChatAPI.createSession returns session ID', async () => {
+            const result = await ChatAPI.createSession('test-key');
+            assert(result.session_id, 'Should return session_id');
+            assertEquals(ChatAPI.sessionId, result.session_id);
+        });
+        
+        test('ChatAPI.sendMessage requires session', async () => {
+            ChatAPI.sessionId = null;
+            try {
+                await ChatAPI.sendMessage('Hello');
+                assert(false, 'Should have thrown error');
+            } catch (e) {
+                assert(e.message === 'No session');
+            }
+        });
+        
+        test('ChatAPI.sendMessage returns EventSource', async () => {
+            ChatAPI.sessionId = 'test-session';
+            const source = await ChatAPI.sendMessage('Hello');
+            assert(source instanceof EventSource, 'Should return EventSource');
+            source.close();
+        });
+        
+        test('ChatAPI.connectMCP requires command', async () => {
+            ChatAPI.sessionId = 'test-session';
+            try {
+                await ChatAPI.connectMCP('');
+                assert(false, 'Should have thrown error');
+            } catch (e) {
+                assert(e.message === 'Command required');
+            }
+        });
+        
+        test('ChatAPI.connectMCP returns status', async () => {
+            ChatAPI.sessionId = 'test-session';
+            const result = await ChatAPI.connectMCP('test-command');
+            assertEquals(result.status, 'connected');
+            assert(result.context, 'Should return context');
+        });
+        
+        // Tests for UI state management
+        const UIState = {
+            messages: [],
+            apiKey: '',
+            systemPrompt: 'You are a helpful assistant.',
+            thinkingBudget: null,
+            maxTokens: 4096,
+            showThinking: true,
+            mcpConnected: false,
+            
+            addMessage(role, content, isThinking = false) {
+                this.messages.push({ role, content, isThinking, timestamp: Date.now() });
+            },
+            
+            clearMessages() {
+                this.messages = [];
+            },
+            
+            updateSettings(settings) {
+                Object.assign(this, settings);
+            }
+        };
+        
+        test('UIState.addMessage adds to messages array', () => {
+            UIState.clearMessages();
+            UIState.addMessage('user', 'Hello');
+            assertEquals(UIState.messages.length, 1);
+            assertEquals(UIState.messages[0].role, 'user');
+            assertEquals(UIState.messages[0].content, 'Hello');
+        });
+        
+        test('UIState.clearMessages empties array', () => {
+            UIState.addMessage('user', 'Test');
+            UIState.clearMessages();
+            assertEquals(UIState.messages.length, 0);
+        });
+        
+        test('UIState.updateSettings updates properties', () => {
+            UIState.updateSettings({ 
+                systemPrompt: 'New prompt',
+                maxTokens: 8192
+            });
+            assertEquals(UIState.systemPrompt, 'New prompt');
+            assertEquals(UIState.maxTokens, 8192);
+        });
+        
+        // Tests for message parsing
+        function parseSSEData(data) {
+            try {
+                return JSON.parse(data);
+            } catch {
+                return data;
+            }
+        }
+        
+        test('parseSSEData handles JSON', () => {
+            const result = parseSSEData('{"key": "value"}');
+            assertEquals(result.key, 'value');
+        });
+        
+        test('parseSSEData handles plain text', () => {
+            const result = parseSSEData('Hello world');
+            assertEquals(result, 'Hello world');
+        });
+        
+        // Tests for local storage
+        const Storage = {
+            save(key, value) {
+                localStorage.setItem(key, JSON.stringify(value));
+            },
+            
+            load(key, defaultValue = null) {
+                const stored = localStorage.getItem(key);
+                return stored ? JSON.parse(stored) : defaultValue;
+            },
+            
+            remove(key) {
+                localStorage.removeItem(key);
+            }
+        };
+        
+        test('Storage save/load roundtrip', () => {
+            const testData = { api: 'test-key', settings: { max: 4096 } };
+            Storage.save('test', testData);
+            const loaded = Storage.load('test');
+            assertEquals(loaded.api, testData.api);
+            assertEquals(loaded.settings.max, testData.settings.max);
+            Storage.remove('test');
+        });
+        
+        test('Storage load with default', () => {
+            Storage.remove('nonexistent');
+            const result = Storage.load('nonexistent', 'default');
+            assertEquals(result, 'default');
+        });
+        
+        // Run tests on load
+        window.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>

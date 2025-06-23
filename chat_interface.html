@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Agent Chat Interface</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Header */
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: 500;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+        
+        .status-dot.connected {
+            background: #28a745;
+        }
+        
+        /* Main Container */
+        .container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 300px;
+            background: #fff;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .sidebar h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #666;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .form-group input[type="number"] {
+            width: 100%;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background: #6c757d;
+        }
+        
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        
+        button.danger {
+            background: #dc3545;
+        }
+        
+        button.danger:hover {
+            background: #c82333;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        /* Chat Area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #fafafa;
+        }
+        
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .message-role {
+            font-weight: 500;
+            font-size: 14px;
+            color: #666;
+            min-width: 80px;
+            text-align: right;
+        }
+        
+        .message-content {
+            flex: 1;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .message.thinking .message-content {
+            background: #f0f8ff;
+            border-color: #b0d4ff;
+            color: #0066cc;
+            font-style: italic;
+        }
+        
+        /* Thinking section */
+        .thinking-section {
+            margin-bottom: 15px;
+            border: 1px solid #b0d4ff;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f8fbff;
+        }
+        
+        .thinking-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px;
+            background: #e8f4ff;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .thinking-header:hover {
+            background: #ddefff;
+        }
+        
+        .thinking-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #0066cc;
+            font-weight: 500;
+        }
+        
+        .thinking-toggle {
+            transition: transform 0.2s;
+            font-size: 12px;
+        }
+        
+        .thinking-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .thinking-content {
+            padding: 15px;
+            font-size: 14px;
+            color: #4a5568;
+            font-style: italic;
+            max-height: 300px;
+            overflow-y: auto;
+            border-top: 1px solid #b0d4ff;
+        }
+        
+        .thinking-content.collapsed {
+            display: none;
+        }
+        
+        .thinking-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #0066cc;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        .message.error .message-content {
+            background: #ffebee;
+            border-color: #ffcdd2;
+            color: #c62828;
+        }
+        
+        /* Input Area */
+        .input-area {
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            padding: 20px;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .input-group textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: none;
+            min-height: 60px;
+        }
+        
+        .input-group button {
+            align-self: flex-end;
+        }
+        
+        /* MCP Section */
+        .mcp-section {
+            border-top: 1px solid #e0e0e0;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+        
+        .mcp-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        /* Loading indicator */
+        .loading {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .loading.active {
+            display: flex;
+        }
+        
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #1976d2;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Streaming cursor */
+        .streaming-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 18px;
+            background: #333;
+            margin-left: 2px;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Claude Agent Chat Interface</h1>
+        <div class="status">
+            <span id="connection-status">Not connected</span>
+            <div class="status-dot" id="status-dot"></div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <h2>Settings</h2>
+            
+            <div class="form-group">
+                <label for="api-key">API Key</label>
+                <input type="password" id="api-key" placeholder="sk-ant-...">
+                <button id="connect-btn" style="margin-top: 10px; width: 100%;">Connect</button>
+            </div>
+            
+            <div class="form-group">
+                <label for="system-prompt">System Prompt</label>
+                <textarea id="system-prompt">You are a helpful assistant.</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="thinking-budget">Thinking Budget (optional)</label>
+                <input type="number" id="thinking-budget" min="1024" max="128000" placeholder="Leave empty to disable">
+            </div>
+            
+            <div class="form-group">
+                <label for="max-tokens">Max Tokens</label>
+                <input type="number" id="max-tokens" min="100" max="200000" value="4096">
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="show-thinking" checked>
+                <label for="show-thinking">Show thinking process</label>
+            </div>
+            
+            <div class="button-group">
+                <button id="clear-btn" class="secondary">Clear Chat</button>
+                <button id="export-btn" class="secondary">Export</button>
+            </div>
+            
+            <div class="mcp-section">
+                <h2>MCP Server</h2>
+                
+                <div class="form-group">
+                    <label for="mcp-command">Command</label>
+                    <input type="text" id="mcp-command" placeholder="e.g., python -m my_mcp_server">
+                </div>
+                
+                <div class="button-group">
+                    <button id="mcp-connect-btn">Connect</button>
+                    <button id="mcp-disconnect-btn" class="danger" disabled>Disconnect</button>
+                </div>
+                
+                <div id="mcp-status" class="mcp-status" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <div class="chat-area">
+            <div class="messages" id="messages">
+                <div class="message">
+                    <div class="message-role">System</div>
+                    <div class="message-content">Welcome! Please enter your Anthropic API key to start chatting.</div>
+                </div>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <span>Claude is typing...</span>
+            </div>
+            
+            <div class="input-area">
+                <div class="input-group">
+                    <textarea id="message-input" placeholder="Type your message..." disabled></textarea>
+                    <button id="send-btn" disabled>Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // API Client
+        class ChatAPI {
+            constructor(baseUrl = 'http://localhost:8080') {
+                this.baseUrl = baseUrl;
+                this.sessionId = null;
+            }
+            
+            async createSession(apiKey) {
+                const response = await fetch(`${this.baseUrl}/api/session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to create session: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                this.sessionId = data.session_id;
+                return data;
+            }
+            
+            async sendMessage(message, settings = {}) {
+                const body = {
+                    session_id: this.sessionId,
+                    message: message,
+                    ...settings
+                };
+                
+                const response = await fetch(`${this.baseUrl}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to send message: ${response.statusText}`);
+                }
+                
+                return response.body.getReader();
+            }
+            
+            async connectMCP(command, args = []) {
+                const response = await fetch(`${this.baseUrl}/api/mcp/connect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: this.sessionId,
+                        command: command,
+                        args: args
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to connect MCP: ${response.statusText}`);
+                }
+                
+                return response.json();
+            }
+            
+            async disconnectMCP() {
+                const response = await fetch(`${this.baseUrl}/api/mcp/disconnect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: this.sessionId })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to disconnect MCP: ${response.statusText}`);
+                }
+                
+                return response.json();
+            }
+            
+            async getMCPStatus() {
+                const response = await fetch(`${this.baseUrl}/api/mcp/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: this.sessionId })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to get MCP status: ${response.statusText}`);
+                }
+                
+                return response.json();
+            }
+        }
+        
+        // UI State Management
+        class UIState {
+            constructor() {
+                this.api = new ChatAPI();
+                this.messages = [];
+                this.isConnected = false;
+                this.isSending = false;
+                this.mcpConnected = false;
+                
+                // Bind elements first
+                this.bindElements();
+                this.bindEvents();
+                
+                // Then load saved settings
+                this.loadSettings();
+                
+                // Update UI
+                this.updateUI();
+            }
+            
+            bindElements() {
+                // Settings
+                this.apiKeyInput = document.getElementById('api-key');
+                this.systemPromptInput = document.getElementById('system-prompt');
+                this.thinkingBudgetInput = document.getElementById('thinking-budget');
+                this.maxTokensInput = document.getElementById('max-tokens');
+                this.showThinkingInput = document.getElementById('show-thinking');
+                
+                // Buttons
+                this.connectBtn = document.getElementById('connect-btn');
+                this.sendBtn = document.getElementById('send-btn');
+                this.clearBtn = document.getElementById('clear-btn');
+                this.exportBtn = document.getElementById('export-btn');
+                
+                // MCP
+                this.mcpCommandInput = document.getElementById('mcp-command');
+                this.mcpConnectBtn = document.getElementById('mcp-connect-btn');
+                this.mcpDisconnectBtn = document.getElementById('mcp-disconnect-btn');
+                this.mcpStatus = document.getElementById('mcp-status');
+                
+                // Chat
+                this.messageInput = document.getElementById('message-input');
+                this.messagesContainer = document.getElementById('messages');
+                this.loadingIndicator = document.getElementById('loading');
+                
+                // Status
+                this.connectionStatus = document.getElementById('connection-status');
+                this.statusDot = document.getElementById('status-dot');
+            }
+            
+            bindEvents() {
+                // Connect button
+                this.connectBtn.addEventListener('click', () => this.connect());
+                
+                // Send message
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.messageInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+                
+                // Settings
+                this.systemPromptInput.addEventListener('change', () => this.saveSettings());
+                this.thinkingBudgetInput.addEventListener('change', () => this.saveSettings());
+                this.maxTokensInput.addEventListener('change', () => this.saveSettings());
+                this.showThinkingInput.addEventListener('change', () => this.saveSettings());
+                
+                // Clear and export
+                this.clearBtn.addEventListener('click', () => this.clearChat());
+                this.exportBtn.addEventListener('click', () => this.exportChat());
+                
+                // MCP
+                this.mcpConnectBtn.addEventListener('click', () => this.connectMCP());
+                this.mcpDisconnectBtn.addEventListener('click', () => this.disconnectMCP());
+            }
+            
+            async connect() {
+                const apiKey = this.apiKeyInput.value.trim();
+                if (!apiKey) {
+                    alert('Please enter your API key');
+                    return;
+                }
+                
+                try {
+                    this.connectBtn.disabled = true;
+                    this.connectBtn.textContent = 'Connecting...';
+                    
+                    await this.api.createSession(apiKey);
+                    this.isConnected = true;
+                    
+                    // Save API key to local storage
+                    localStorage.setItem('claude_api_key', apiKey);
+                    
+                    this.addSystemMessage('Connected successfully! You can now start chatting.');
+                    this.updateUI();
+                    
+                } catch (error) {
+                    alert(`Failed to connect: ${error.message}`);
+                    this.isConnected = false;
+                    this.updateUI();
+                }
+            }
+            
+            async sendMessage() {
+                const message = this.messageInput.value.trim();
+                if (!message || this.isSending) return;
+                
+                this.isSending = true;
+                this.messageInput.value = '';
+                this.updateUI();
+                
+                // Add user message
+                this.addMessage('user', message);
+                
+                // Prepare settings
+                const settings = {
+                    system_prompt: this.systemPromptInput.value,
+                    max_tokens: parseInt(this.maxTokensInput.value) || 4096
+                };
+                
+                const thinkingBudget = parseInt(this.thinkingBudgetInput.value);
+                if (thinkingBudget) {
+                    settings.thinking_budget = thinkingBudget;
+                }
+                
+                try {
+                    const reader = await this.api.sendMessage(message, settings);
+                    await this.handleStream(reader);
+                } catch (error) {
+                    this.addMessage('error', `Error: ${error.message}`, false, true);
+                } finally {
+                    this.isSending = false;
+                    this.updateUI();
+                }
+            }
+            
+            async handleStream(reader) {
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let thinkingSection = null;
+                let thinkingContent = '';
+                let responseDiv = null;
+                let responseContent = '';
+                let isThinking = false;
+                let messageWrapper = null;
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('event:')) {
+                            const event = line.substring(6).trim();
+                            
+                            if (event === 'thinking') {
+                                isThinking = true;
+                                if (this.showThinkingInput.checked && !thinkingSection) {
+                                    messageWrapper = this.createMessageWrapper();
+                                    thinkingSection = this.createThinkingSection(messageWrapper);
+                                }
+                            } else if (event === 'response') {
+                                // Collapse thinking section when response starts
+                                if (thinkingSection) {
+                                    this.collapseThinking(thinkingSection);
+                                }
+                                
+                                if (!responseDiv) {
+                                    if (!messageWrapper) {
+                                        messageWrapper = this.createMessageWrapper();
+                                    }
+                                    responseDiv = this.createResponseDiv(messageWrapper);
+                                }
+                                isThinking = false;
+                            } else if (event === 'done') {
+                                // Finalize thinking section
+                                if (thinkingSection) {
+                                    this.finalizeThinking(thinkingSection, thinkingContent);
+                                }
+                                // Finalize response
+                                if (responseDiv) {
+                                    responseDiv.textContent = responseContent;
+                                }
+                                return;
+                            } else if (event === 'error') {
+                                // Error will be in next data line
+                            }
+                        } else if (line.startsWith('data:')) {
+                            const data = line.substring(5).trim();
+                            if (data) {
+                                try {
+                                    // Try to parse as JSON and extract string content
+                                    const parsed = JSON.parse(data);
+                                    const content = typeof parsed === 'string' ? parsed : '';
+                                    
+                                    if (isThinking) {
+                                        thinkingContent += content;
+                                        if (thinkingSection) {
+                                            this.updateThinkingContent(thinkingSection, thinkingContent);
+                                        }
+                                    } else {
+                                        responseContent += content;
+                                        if (responseDiv) {
+                                            responseDiv.innerHTML = this.escapeHtml(responseContent) + '<span class="streaming-cursor"></span>';
+                                            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+                                        }
+                                    }
+                                } catch {
+                                    // If not JSON, treat as plain text
+                                    if (data !== '""') {
+                                        if (isThinking) {
+                                            thinkingContent += data;
+                                            if (thinkingSection) {
+                                                this.updateThinkingContent(thinkingSection, thinkingContent);
+                                            }
+                                        } else {
+                                            responseContent += data;
+                                            if (responseDiv) {
+                                                responseDiv.innerHTML = this.escapeHtml(responseContent) + '<span class="streaming-cursor"></span>';
+                                                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            createMessageWrapper() {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'message';
+                
+                const roleDiv = document.createElement('div');
+                roleDiv.className = 'message-role';
+                roleDiv.textContent = 'Assistant';
+                
+                const contentWrapper = document.createElement('div');
+                contentWrapper.style.flex = '1';
+                
+                wrapper.appendChild(roleDiv);
+                wrapper.appendChild(contentWrapper);
+                
+                this.messagesContainer.appendChild(wrapper);
+                return contentWrapper;
+            }
+            
+            createThinkingSection(wrapper) {
+                const section = document.createElement('div');
+                section.className = 'thinking-section';
+                
+                // Header
+                const header = document.createElement('div');
+                header.className = 'thinking-header';
+                
+                const title = document.createElement('div');
+                title.className = 'thinking-title';
+                title.innerHTML = '<span class="thinking-indicator"></span> Thinking...';
+                
+                const toggle = document.createElement('div');
+                toggle.className = 'thinking-toggle';
+                toggle.textContent = '▼';
+                
+                header.appendChild(title);
+                header.appendChild(toggle);
+                
+                // Content
+                const content = document.createElement('div');
+                content.className = 'thinking-content';
+                content.innerHTML = '<span class="streaming-cursor"></span>';
+                
+                section.appendChild(header);
+                section.appendChild(content);
+                
+                // Click handler for expand/collapse
+                header.addEventListener('click', () => {
+                    content.classList.toggle('collapsed');
+                    toggle.classList.toggle('collapsed');
+                });
+                
+                wrapper.appendChild(section);
+                
+                return { section, content, title };
+            }
+            
+            updateThinkingContent(thinkingSection, content) {
+                thinkingSection.content.innerHTML = this.escapeHtml(content) + '<span class="streaming-cursor"></span>';
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            }
+            
+            collapseThinking(thinkingSection) {
+                thinkingSection.content.classList.add('collapsed');
+                thinkingSection.section.querySelector('.thinking-toggle').classList.add('collapsed');
+                thinkingSection.title.innerHTML = 'Thinking complete';
+            }
+            
+            finalizeThinking(thinkingSection, content) {
+                thinkingSection.content.textContent = content;
+                const wordCount = content.split(/\s+/).length;
+                thinkingSection.title.innerHTML = `Thinking complete (${wordCount} words)`;
+            }
+            
+            createResponseDiv(wrapper) {
+                const responseDiv = document.createElement('div');
+                responseDiv.className = 'message-content';
+                wrapper.appendChild(responseDiv);
+                
+                // Save to messages array
+                this.messages.push({ 
+                    role: 'assistant', 
+                    content: '', 
+                    timestamp: Date.now(), 
+                    div: responseDiv 
+                });
+                
+                return responseDiv;
+            }
+            
+            async connectMCP() {
+                const command = this.mcpCommandInput.value.trim();
+                if (!command) {
+                    alert('Please enter MCP server command');
+                    return;
+                }
+                
+                try {
+                    this.mcpConnectBtn.disabled = true;
+                    this.mcpConnectBtn.textContent = 'Connecting...';
+                    
+                    // Parse command and args
+                    const parts = command.split(' ');
+                    const cmd = parts[0];
+                    const args = parts.slice(1);
+                    
+                    const result = await this.api.connectMCP(cmd, args);
+                    this.mcpConnected = true;
+                    
+                    this.mcpStatus.style.display = 'block';
+                    this.mcpStatus.textContent = result.context || 'Connected to MCP server';
+                    
+                    this.addSystemMessage('MCP server connected successfully!');
+                    this.updateUI();
+                    
+                } catch (error) {
+                    alert(`Failed to connect MCP: ${error.message}`);
+                } finally {
+                    this.mcpConnectBtn.disabled = false;
+                    this.mcpConnectBtn.textContent = 'Connect';
+                }
+            }
+            
+            async disconnectMCP() {
+                try {
+                    await this.api.disconnectMCP();
+                    this.mcpConnected = false;
+                    this.mcpStatus.style.display = 'none';
+                    this.addSystemMessage('MCP server disconnected.');
+                    this.updateUI();
+                } catch (error) {
+                    alert(`Failed to disconnect MCP: ${error.message}`);
+                }
+            }
+            
+            addMessage(role, content, isThinking = false, isError = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                if (isThinking) messageDiv.classList.add('thinking');
+                if (isError) messageDiv.classList.add('error');
+                
+                const roleDiv = document.createElement('div');
+                roleDiv.className = 'message-role';
+                roleDiv.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = content;
+                
+                messageDiv.appendChild(roleDiv);
+                messageDiv.appendChild(contentDiv);
+                
+                this.messagesContainer.appendChild(messageDiv);
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+                
+                // Save to messages array
+                this.messages.push({ role, content, isThinking, timestamp: Date.now() });
+            }
+            
+            addSystemMessage(content) {
+                this.addMessage('system', content);
+            }
+            
+            clearChat() {
+                if (confirm('Clear all messages?')) {
+                    this.messages = [];
+                    this.messagesContainer.innerHTML = '';
+                    this.addSystemMessage('Chat cleared. Ready for new conversation.');
+                }
+            }
+            
+            exportChat() {
+                const data = {
+                    messages: this.messages,
+                    settings: {
+                        systemPrompt: this.systemPromptInput.value,
+                        thinkingBudget: this.thinkingBudgetInput.value,
+                        maxTokens: this.maxTokensInput.value,
+                        showThinking: this.showThinkingInput.checked
+                    },
+                    timestamp: new Date().toISOString()
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `claude-chat-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+            
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            updateUI() {
+                // Connection status
+                this.connectionStatus.textContent = this.isConnected ? 'Connected' : 'Not connected';
+                this.statusDot.classList.toggle('connected', this.isConnected);
+                
+                // Connect button
+                this.connectBtn.textContent = this.isConnected ? 'Reconnect' : 'Connect';
+                this.connectBtn.disabled = false;  // Always allow connection/reconnection
+                
+                // Chat controls
+                this.messageInput.disabled = !this.isConnected || this.isSending;
+                this.sendBtn.disabled = !this.isConnected || this.isSending;
+                
+                // MCP controls
+                this.mcpConnectBtn.disabled = !this.isConnected || this.mcpConnected;
+                this.mcpDisconnectBtn.disabled = !this.mcpConnected;
+                
+                // Loading indicator
+                this.loadingIndicator.classList.toggle('active', this.isSending);
+            }
+            
+            saveSettings() {
+                const settings = {
+                    systemPrompt: this.systemPromptInput.value,
+                    thinkingBudget: this.thinkingBudgetInput.value,
+                    maxTokens: this.maxTokensInput.value,
+                    showThinking: this.showThinkingInput.checked,
+                    mcpCommand: this.mcpCommandInput.value
+                };
+                
+                localStorage.setItem('claude_chat_settings', JSON.stringify(settings));
+            }
+            
+            loadSettings() {
+                try {
+                    // Load API key
+                    const savedApiKey = localStorage.getItem('claude_api_key');
+                    if (savedApiKey && this.apiKeyInput) {
+                        this.apiKeyInput.value = savedApiKey;
+                    }
+                    
+                    // Load settings
+                    const savedSettings = localStorage.getItem('claude_chat_settings');
+                    if (savedSettings) {
+                        const settings = JSON.parse(savedSettings);
+                        if (this.systemPromptInput) {
+                            this.systemPromptInput.value = settings.systemPrompt || 'You are a helpful assistant.';
+                        }
+                        if (this.thinkingBudgetInput) {
+                            this.thinkingBudgetInput.value = settings.thinkingBudget || '';
+                        }
+                        if (this.maxTokensInput) {
+                            this.maxTokensInput.value = settings.maxTokens || '4096';
+                        }
+                        if (this.showThinkingInput) {
+                            this.showThinkingInput.checked = settings.showThinking !== false;
+                        }
+                        if (this.mcpCommandInput) {
+                            this.mcpCommandInput.value = settings.mcpCommand || '';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to load settings:', e);
+                }
+            }
+        }
+        
+        // Initialize UI
+        const ui = new UIState();
+    </script>
+</body>
+</html>

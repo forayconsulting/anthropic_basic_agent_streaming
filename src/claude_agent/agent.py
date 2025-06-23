@@ -124,6 +124,11 @@ class ClaudeAgent:
                 async for chunk in response.aiter_bytes():
                     # Parse SSE events
                     for sse_event in self._sse_parser.parse(chunk):
+                        # Debug log all events
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.debug(f"SSE event: {sse_event.event}, data keys: {list(sse_event.data.keys()) if sse_event.data else 'None'}")
+                        
                         # Handle error events
                         if sse_event.event == "error":
                             error_msg = sse_event.data.get("error", {}).get("message", "Unknown error")

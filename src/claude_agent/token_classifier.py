@@ -3,8 +3,11 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, Any, List, Generator, Optional
+import logging
 
 from .sse_parser import SSEEvent
+
+logger = logging.getLogger(__name__)
 
 
 class TokenType(Enum):
@@ -70,11 +73,21 @@ class TokenClassifier:
         # Handle content block delta events
         elif event.event == "content_block_delta":
             delta = event.data.get("delta", {})
-            if delta.get("type") == "text_delta":
+            delta_type = delta.get("type", "")
+            
+            # Debug what type of delta we're getting
+            if self._current_block_type == "thinking":
+                logger.debug(f"Thinking delta - type: {delta_type}, delta keys: {list(delta.keys())}")
+            
+            # Handle both text_delta and thinking_delta
+            if delta_type == "text_delta":
                 text = delta.get("text", "")
                 if text:
                     # Determine token type based on current block
                     token_type = self._get_current_token_type()
+                    
+                    # Debug logging
+                    logger.info(f"Text delta - block type: {self._current_block_type}, text: {repr(text[:50])}")
                     
                     metadata = {
                         "block_index": event.data.get("index", 0),
@@ -90,6 +103,23 @@ class TokenClassifier:
                         content=text,
                         metadata=metadata
                     )
+            
+            elif delta_type == "thinking_delta":
+                # Handle thinking deltas which have a different structure
+                thinking_text = delta.get("thinking", "")
+                if thinking_text:
+                    logger.info(f"Thinking delta - text: {repr(thinking_text[:50])}")
+                    
+                    metadata = {
+                        "block_index": event.data.get("index", 0),
+                        "block_type": self._current_block_type
+                    }
+                    
+                    yield ClassifiedToken(
+                        type=TokenType.THINKING,
+                        content=thinking_text,
+                        metadata=metadata
+                    )
         
         # Handle content block stop events
         elif event.event == "content_block_stop":
@@ -102,6 +132,11 @@ class TokenClassifier:
         content_block = event.data.get("content_block", {})
         self._current_block_type = content_block.get("type", "text")
         self._block_index = event.data.get("index", 0)
+        
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Content block started - type: {self._current_block_type}, index: {self._block_index}")
     
     def _get_current_token_type(self) -> TokenType:
         """Get token type based on current block type."""
