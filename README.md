@@ -8,6 +8,7 @@ A minimal Python implementation of a Claude-based agent with MCP (Model Context 
 - 🧠 **Extended Thinking**: Support for Claude's extended thinking mode with separate thinking/response token classification
 - 🔧 **MCP Integration**: Connect to local MCP servers via stdio transport
 - 💬 **Conversation History**: Maintain context across multiple interactions
+- 🌐 **Web Chat Interface**: User-friendly browser interface with real-time streaming
 - 🎯 **Type-Safe**: Full type hints throughout the codebase
 - ✅ **Test-Driven**: Comprehensive test coverage using TDD methodology
 
@@ -28,6 +29,18 @@ pip install -e ".[dev]"
 
 ## Quick Start
 
+### Option 1: Web Chat Interface
+
+```bash
+# Run the chat interface
+python run_chat.py
+
+# Opens browser at http://localhost:8080
+# Enter your API key in the web interface
+```
+
+### Option 2: Programmatic Usage
+
 ```python
 import asyncio
 from claude_agent.agent import ClaudeAgent, StreamEventType
@@ -46,6 +59,19 @@ async def main():
 
 asyncio.run(main())
 ```
+
+## Web Chat Interface
+
+The included web interface provides an easy way to test and interact with the Claude agent:
+
+- **BYOK Support**: Enter your Anthropic API key directly in the interface
+- **Real-time Streaming**: See responses as they're generated
+- **Extended Thinking**: Toggle thinking mode with collapsible thinking process display
+- **MCP Server Connection**: Connect to any MCP server from the UI
+- **Conversation History**: Full history with export functionality
+- **Persistent Settings**: Your preferences are saved locally
+
+See [CHAT_INTERFACE_README.md](CHAT_INTERFACE_README.md) for detailed documentation.
 
 ## Extended Thinking Mode
 
