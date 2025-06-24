@@ -87,7 +87,7 @@ class TokenClassifier:
                     token_type = self._get_current_token_type()
                     
                     # Debug logging
-                    logger.info(f"Text delta - block type: {self._current_block_type}, text: {repr(text[:50])}")
+                    logger.debug(f"Text delta - block type: {self._current_block_type}, text: {repr(text[:50])}")
                     
                     metadata = {
                         "block_index": event.data.get("index", 0),
@@ -108,7 +108,7 @@ class TokenClassifier:
                 # Handle thinking deltas which have a different structure
                 thinking_text = delta.get("thinking", "")
                 if thinking_text:
-                    logger.info(f"Thinking delta - text: {repr(thinking_text[:50])}")
+                    logger.debug(f"Thinking delta - text: {repr(thinking_text[:50])}")
                     
                     metadata = {
                         "block_index": event.data.get("index", 0),
@@ -136,7 +136,7 @@ class TokenClassifier:
         # Debug logging
         import logging
         logger = logging.getLogger(__name__)
-        logger.info(f"Content block started - type: {self._current_block_type}, index: {self._block_index}")
+        logger.debug(f"Content block started - type: {self._current_block_type}, index: {self._block_index}")
     
     def _get_current_token_type(self) -> TokenType:
         """Get token type based on current block type."""

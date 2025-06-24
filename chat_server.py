@@ -181,7 +181,7 @@ class ChatHandler(BaseHTTPRequestHandler):
                 conversation_history=session['conversation_history']
             ):
                 if event.type == StreamEventType.THINKING:
-                    logger.info(f"Streaming thinking token: {repr(event.content[:20])}")
+                    logger.debug(f"Streaming thinking token: {repr(event.content[:20])}")
                     self._send_sse_event("thinking", event.content)
                 elif event.type == StreamEventType.RESPONSE:
                     response_parts.append(event.content)
@@ -204,9 +204,15 @@ class ChatHandler(BaseHTTPRequestHandler):
             self._send_sse_event("done", "")
             logger.info("Stream completed successfully")
             
+        except (BrokenPipeError, ConnectionResetError) as e:
+            logger.warning(f"Client disconnected during streaming: {e}")
+            # Don't try to send error event if client is gone
         except Exception as e:
             logger.error(f"Error in streaming: {e}", exc_info=True)
-            self._send_sse_event("error", str(e))
+            try:
+                self._send_sse_event("error", str(e))
+            except:
+                pass  # Client might be disconnected
     
     def handle_mcp_connect(self, data: Dict[str, Any]):
         """Handle MCP connection."""
@@ -321,8 +327,12 @@ class ChatHandler(BaseHTTPRequestHandler):
             event = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
             self.wfile.write(event.encode('utf-8'))
             self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError) as e:
+            logger.warning(f"Client disconnected: {e}")
+            raise  # Re-raise to stop the stream
         except Exception as e:
             logger.error(f"Error sending SSE event: {e}")
+            raise  # Re-raise to stop the stream
     
     def log_message(self, format, *args):
         """Override to reduce logging noise."""

@@ -12,7 +12,6 @@ from .mcp_client import MCPClientWrapper
 from .api_request_builder import APIRequestBuilder
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 class StreamEventType(Enum):
@@ -130,7 +129,7 @@ class ClaudeAgent:
                     # Parse SSE events
                     for sse_event in self._sse_parser.parse(chunk):
                         # Debug log all events
-                        logger.info(f"SSE event: {sse_event.event}, data keys: {list(sse_event.data.keys()) if sse_event.data else 'None'}")
+                        logger.debug(f"SSE event: {sse_event.event}, data keys: {list(sse_event.data.keys()) if sse_event.data else 'None'}")
                         
                         # Handle error events
                         if sse_event.event == "error":
@@ -170,12 +169,15 @@ class ClaudeAgent:
                     
                     # Break outer loop if stream is complete
                     if stream_complete:
-                        logger.info("Breaking outer loop - stream complete")
+                        logger.debug("Breaking outer loop - stream complete")
                         break
                 
                 # After the loop, check if there's any remaining data in the buffer
-                logger.info("Checking for remaining data in SSE parser buffer")
+                logger.debug("Checking for remaining data in SSE parser buffer")
                 for sse_event in self._sse_parser.parse(b""):  # Flush buffer
-                    logger.info(f"Final SSE event: {sse_event.event}")
+                    logger.debug(f"Final SSE event: {sse_event.event}")
                     if sse_event.event == "message_stop":
-                        logger.info("Found message_stop in final buffer flush")
+                        logger.debug("Found message_stop in final buffer flush")
+                
+                # Ensure the response is properly closed
+                await response.aclose()
