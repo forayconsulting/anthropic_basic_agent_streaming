@@ -701,6 +701,7 @@
                 let responseContent = '';
                 let isThinking = false;
                 let messageWrapper = null;
+                let isError = false;
                 
                 try {
                     while (true) {
@@ -758,11 +759,38 @@
                                 }
                                 return;
                             } else if (event === 'error') {
-                                // Error will be in next data line
+                                // Mark that we're expecting error data
+                                isError = true;
                             }
                         } else if (line.startsWith('data:')) {
                             const data = line.substring(5).trim();
                             if (data) {
+                                // Handle error data
+                                if (isError) {
+                                    try {
+                                        const errorData = JSON.parse(data);
+                                        if (errorData.error) {
+                                            // Handle different error types
+                                            const errorType = errorData.error.type;
+                                            const errorMessage = errorData.error.message || 'Unknown error';
+                                            
+                                            if (errorType === 'overloaded_error') {
+                                                this.addMessage('error', 'Claude API is temporarily overloaded. Please try again in a moment.', false, true);
+                                            } else {
+                                                this.addMessage('error', `API Error: ${errorMessage}`, false, true);
+                                            }
+                                            
+                                            // Cancel the reader and stop processing
+                                            await reader.cancel();
+                                            return;
+                                        }
+                                    } catch (e) {
+                                        console.error('Error parsing error data:', e);
+                                    }
+                                    isError = false;
+                                    continue;
+                                }
+                                
                                 try {
                                     // Try to parse as JSON and extract string content
                                     const parsed = JSON.parse(data);
