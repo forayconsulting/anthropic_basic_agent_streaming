@@ -742,7 +742,15 @@
                                 }
                                 // Finalize response
                                 if (responseDiv) {
-                                    responseDiv.textContent = responseContent;
+                                    // Remove the streaming cursor if present
+                                    const cursor = responseDiv.querySelector('.streaming-cursor');
+                                    if (cursor) {
+                                        cursor.remove();
+                                    }
+                                    // If responseContent is empty but div has content, preserve it
+                                    if (!responseContent && responseDiv.textContent) {
+                                        responseContent = responseDiv.textContent;
+                                    }
                                     // Update the message content in the messages array
                                     if (this.messages.length > 0) {
                                         const lastMessage = this.messages[this.messages.length - 1];
@@ -808,8 +816,9 @@
                                             this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
                                         }
                                     }
-                                } catch {
+                                } catch (e) {
                                     // If not JSON, treat as plain text
+                                    console.debug('Non-JSON data:', data, 'isThinking:', isThinking);
                                     if (data !== '""') {
                                         if (isThinking) {
                                             thinkingContent += data;
@@ -818,6 +827,7 @@
                                             }
                                         } else {
                                             responseContent += data;
+                                            console.debug('Accumulated response:', responseContent);
                                             if (responseDiv) {
                                                 responseDiv.innerHTML = this.escapeHtml(responseContent) + '<span class="streaming-cursor"></span>';
                                                 this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
