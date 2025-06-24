@@ -158,13 +158,39 @@ class ChatHandler(BaseHTTPRequestHandler):
     
     def _stream_response(self, session: Dict[str, Any], message: str):
         """Stream response from agent (runs in thread pool)."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        try:
-            loop.run_until_complete(self._async_stream_response(session, message))
-        finally:
-            loop.close()
+        # Use asyncio.run if available (Python 3.7+)
+        if sys.version_info >= (3, 7):
+            asyncio.run(self._async_stream_response(session, message))
+        else:
+            # Fallback for older Python versions
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                loop.run_until_complete(self._async_stream_response(session, message))
+            finally:
+                # Shutdown async generators
+                try:
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                except:
+                    pass
+                
+                # Cancel remaining tasks
+                try:
+                    pending = asyncio.all_tasks(loop)
+                except AttributeError:
+                    # Python 3.6 compatibility
+                    pending = asyncio.Task.all_tasks(loop)
+                
+                for task in pending:
+                    task.cancel()
+                
+                # Give tasks a chance to finish
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                
+                # Close the loop
+                loop.close()
     
     async def _async_stream_response(self, session: Dict[str, Any], message: str):
         """Async streaming implementation."""

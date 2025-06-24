@@ -178,6 +178,3 @@ class ClaudeAgent:
                     logger.debug(f"Final SSE event: {sse_event.event}")
                     if sse_event.event == "message_stop":
                         logger.debug("Found message_stop in final buffer flush")
-                
-                # Ensure the response is properly closed
-                await response.aclose()
