@@ -62,6 +62,8 @@ asyncio.run(main())
 
 ## Web Chat Interface
 
+![Claude Agent Chat Interface](screenshot.png)
+
 The included web interface provides an easy way to test and interact with the Claude agent:
 
 - **BYOK Support**: Enter your Anthropic API key directly in the interface
