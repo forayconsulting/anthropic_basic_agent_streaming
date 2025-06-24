@@ -4,6 +4,9 @@ __version__ = "0.1.0"
 
 from .agent import ClaudeAgent, StreamEvent, StreamEventType
 from .mcp_client import MCPClientWrapper, MCPTool, MCPResource
+from .mcp_client_fixed import FixedMCPClient
+from .mcp_session_manager import MCPSessionManager
+from .agent_v2_complete import ClaudeAgentV2
 from .api_request_builder import APIRequestBuilder
 from .sse_parser import SSEParser, SSEEvent
 from .token_classifier import TokenClassifier, TokenType, ClassifiedToken

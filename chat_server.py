@@ -17,6 +17,12 @@ import threading
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from claude_agent.agent import ClaudeAgent, StreamEventType
+from claude_agent.agent_v2_complete import ClaudeAgentV2, StreamEventType as StreamEventTypeV2, StreamEvent
+from mcp_command_parser import parse_mcp_command
+
+# Use V2 agent with fixed MCP support
+ClaudeAgent = ClaudeAgentV2
+StreamEventType = StreamEventTypeV2  # Use the V2 enum too!
 
 # Configure logging
 logging.basicConfig(
@@ -206,14 +212,25 @@ class ChatHandler(BaseHTTPRequestHandler):
                 max_tokens=session['max_tokens'],
                 conversation_history=session['conversation_history']
             ):
+                # Log first few events at INFO level for debugging
+                if hasattr(self, '_event_count'):
+                    self._event_count += 1
+                else:
+                    self._event_count = 1
+                    
+                if self._event_count <= 5:
+                    logger.info(f"Event #{self._event_count}: type={event.type.value}, content_preview={repr(event.content[:50]) if event.content else 'None'}")
+                
                 if event.type == StreamEventType.THINKING:
-                    logger.debug(f"Streaming thinking token: {repr(event.content[:20])}")
                     self._send_sse_event("thinking", event.content)
                 elif event.type == StreamEventType.RESPONSE:
                     response_parts.append(event.content)
                     self._send_sse_event("response", event.content)
                 elif event.type == StreamEventType.ERROR:
                     self._send_sse_event("error", event.content)
+                    logger.error(f"Stream error: {event.content}")
+                else:
+                    logger.warning(f"Unknown event type: {event.type}")
             
             logger.info("Stream loop completed - updating conversation history")
             
@@ -250,13 +267,14 @@ class ChatHandler(BaseHTTPRequestHandler):
         session = sessions[session_id]
         command = data.get('command', '')
         args = data.get('args', [])
+        env = data.get('env', None)
         
         if not command:
             self.send_error(400, "Command required")
             return
         
         # Connect in a separate thread
-        future = executor.submit(self._connect_mcp, session, command, args)
+        future = executor.submit(self._connect_mcp, session, command, args, env)
         
         try:
             result = future.result(timeout=10)
@@ -264,29 +282,37 @@ class ChatHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_error(500, str(e))
     
-    def _connect_mcp(self, session: Dict[str, Any], command: str, args: List[str]):
+    def _connect_mcp(self, session: Dict[str, Any], command: str, args: List[str], env: Optional[Dict[str, str]] = None):
         """Connect to MCP server (runs in thread pool)."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
         try:
-            result = loop.run_until_complete(self._async_connect_mcp(session, command, args))
+            result = loop.run_until_complete(self._async_connect_mcp(session, command, args, env))
             return result
         finally:
             loop.close()
     
-    async def _async_connect_mcp(self, session: Dict[str, Any], command: str, args: List[str]):
+    async def _async_connect_mcp(self, session: Dict[str, Any], command: str, args: List[str], env: Optional[Dict[str, str]] = None):
         """Async MCP connection."""
         try:
             agent = session['agent']
-            await agent.connect_mcp(command, args)
+            logger.info(f"Connecting MCP - command: {command}, args: {args}, env keys: {list(env.keys()) if env else 'None'}")
+            
+            await agent.connect_mcp(command, args, env)
             session['mcp_connected'] = True
             
-            # Get context
-            context = await agent._mcp_client.get_context()
+            # Wait a bit for server to fully initialize
+            await asyncio.sleep(1)
+            
+            # Get context - not async!
+            context = agent._mcp_client.get_context()
+            logger.info(f"MCP context retrieved: {context[:200]}..." if context else "No context")
+            
             return {"status": "connected", "context": context}
         except Exception as e:
-            logger.error(f"MCP connection error: {e}")
+            logger.error(f"MCP connection error: {e}", exc_info=True)
+            session['mcp_connected'] = False
             return {"status": "error", "error": str(e)}
     
     def handle_mcp_disconnect(self, data: Dict[str, Any]):

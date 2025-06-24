@@ -427,6 +427,12 @@
                 <div class="form-group">
                     <label for="mcp-command">Command</label>
                     <input type="text" id="mcp-command" placeholder="e.g., python -m my_mcp_server">
+                    <small style="color: #666; display: block; margin-top: 5px;">
+                        Formats:<br>
+                        • Simple: <code>npx -y @modelcontextprotocol/server-github</code><br>
+                        • With env: <code>GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx npx -y @modelcontextprotocol/server-github</code><br>
+                        • JSON: <code>{"command": "npx", "args": ["-y", "pkg"], "env": {"TOKEN": "value"}}</code>
+                    </small>
                 </div>
                 
                 <div class="button-group">
@@ -504,14 +510,15 @@
                 return response.body.getReader();
             }
             
-            async connectMCP(command, args = []) {
+            async connectMCP(command, args = [], env = null) {
                 const response = await fetch(`${this.baseUrl}/api/mcp/connect`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         session_id: this.sessionId,
                         command: command,
-                        args: args
+                        args: args,
+                        env: env
                     })
                 });
                 
@@ -949,12 +956,51 @@
                     this.mcpConnectBtn.disabled = true;
                     this.mcpConnectBtn.textContent = 'Connecting...';
                     
-                    // Parse command and args
-                    const parts = command.split(' ');
-                    const cmd = parts[0];
-                    const args = parts.slice(1);
+                    // Parse command - check for JSON format first
+                    let cmd, args, env;
                     
-                    const result = await this.api.connectMCP(cmd, args);
+                    if (command.startsWith('{')) {
+                        // JSON format
+                        try {
+                            const parsed = JSON.parse(command);
+                            cmd = parsed.command;
+                            args = parsed.args || [];
+                            env = parsed.env || null;
+                        } catch (e) {
+                            throw new Error('Invalid JSON format');
+                        }
+                    } else {
+                        // Check for environment variables at the start
+                        const envPattern = /^([A-Z_][A-Z0-9_]*=[^ ]+\s+)*/;
+                        const match = command.match(envPattern);
+                        
+                        if (match && match[0]) {
+                            // Extract env vars
+                            env = {};
+                            const envPart = match[0].trim();
+                            const envPairs = envPart.split(/\s+/);
+                            for (const pair of envPairs) {
+                                const [key, value] = pair.split('=');
+                                if (key && value) {
+                                    env[key] = value;
+                                }
+                            }
+                            
+                            // Get command after env vars
+                            const commandPart = command.substring(match[0].length).trim();
+                            const parts = commandPart.split(' ');
+                            cmd = parts[0];
+                            args = parts.slice(1);
+                        } else {
+                            // Simple command without env vars
+                            const parts = command.split(' ');
+                            cmd = parts[0];
+                            args = parts.slice(1);
+                            env = null;
+                        }
+                    }
+                    
+                    const result = await this.api.connectMCP(cmd, args, env);
                     this.mcpConnected = true;
                     
                     this.mcpStatus.style.display = 'block';

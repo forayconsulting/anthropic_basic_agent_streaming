@@ -61,36 +61,70 @@ class MCPClientWrapper:
         if self._session:
             await self.disconnect()
         
+        # Merge environment variables with current environment
+        full_env = os.environ.copy()
+        if env:
+            full_env.update(env)
+            print(f"MCP Debug - Environment variables being passed: {list(env.keys())}")
+        
         # Store server parameters
         self._server_params = StdioServerParameters(
             command=command,
             args=args or [],
-            env=env,
+            env=full_env,  # Use merged environment
             cwd=cwd
         )
+        
+        print(f"MCP Debug - Starting server: {command} {' '.join(args)}")
         
         # Start the stdio connection in a background task
         self._stdio_task = asyncio.create_task(self._run_stdio_connection())
         
         # Wait for connection to be established with timeout
         retries = 0
-        while not self._session and retries < 100:  # 10 seconds timeout
+        error_message = None
+        while retries < 100:  # 10 seconds timeout
             await asyncio.sleep(0.1)
             retries += 1
+            
+            # Check if task failed
+            if self._stdio_task.done():
+                try:
+                    # This will raise if there was an exception
+                    await self._stdio_task
+                except Exception as e:
+                    error_message = str(e)
+                    print(f"MCP Debug - Task failed: {error_message}")
+                    break
+            
+            # Check if session is established
+            if self._session:
+                print("MCP Debug - Session established successfully")
+                break
         
         if not self._session:
-            raise TimeoutError("Failed to establish MCP connection after 10 seconds")
+            if error_message:
+                raise RuntimeError(f"MCP connection failed: {error_message}")
+            else:
+                raise TimeoutError("Failed to establish MCP connection after 10 seconds")
     
     async def _run_stdio_connection(self) -> None:
         """Run the stdio connection in the background."""
         try:
+            print("MCP Debug - Starting stdio client...")
             async with stdio_client(self._server_params) as (read_stream, write_stream):
+                print("MCP Debug - Stdio streams created")
+                
                 # Create and initialize session
                 self._session = ClientSession(read_stream, write_stream)
+                print("MCP Debug - Initializing session...")
                 await self._session.initialize()
+                print("MCP Debug - Session initialized")
                 
                 # Refresh capabilities
+                print("MCP Debug - Refreshing capabilities...")
                 await self.refresh_capabilities()
+                print(f"MCP Debug - Found {len(self._tools)} tools and {len(self._resources)} resources")
                 
                 # Keep the connection alive
                 try:
@@ -106,6 +140,8 @@ class MCPClientWrapper:
                     
         except Exception as e:
             print(f"MCP connection error: {e}")
+            import traceback
+            traceback.print_exc()
             self._session = None
     
     async def disconnect(self) -> None:
@@ -127,7 +163,10 @@ class MCPClientWrapper:
         if not self._session:
             raise RuntimeError("MCP client not connected")
         
+        print("MCP Debug - Listing tools...")
         result = await self._session.list_tools()
+        print(f"MCP Debug - Server returned {len(result.tools) if result.tools else 0} tools")
+        
         self._tools = [
             MCPTool(
                 name=tool.name,
@@ -136,6 +175,12 @@ class MCPClientWrapper:
             )
             for tool in result.tools
         ]
+        
+        if self._tools:
+            print("MCP Debug - Tools found:")
+            for tool in self._tools[:3]:  # Show first 3 tools
+                print(f"  - {tool.name}: {tool.description[:50]}...")
+        
         return self._tools
     
     async def list_resources(self) -> List[MCPResource]:
@@ -231,8 +276,16 @@ class MCPClientWrapper:
     async def refresh_capabilities(self) -> None:
         """Refresh tools and resources from server."""
         if not self._session:
+            print("MCP Debug - No session available for refresh_capabilities")
             return
         
-        # Refresh both tools and resources
-        await self.list_tools()
-        await self.list_resources()
+        try:
+            # Refresh both tools and resources
+            print("MCP Debug - Refreshing tools...")
+            await self.list_tools()
+            print("MCP Debug - Refreshing resources...")
+            await self.list_resources()
+        except Exception as e:
+            print(f"MCP Debug - Error refreshing capabilities: {e}")
+            import traceback
+            traceback.print_exc()
