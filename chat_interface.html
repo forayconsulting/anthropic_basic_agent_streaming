@@ -664,10 +664,7 @@
                 this.messageInput.value = '';
                 this.updateUI();
                 
-                // Add user message
-                this.addMessage('user', message);
-                
-                // Prepare settings
+                // Prepare settings BEFORE adding user message
                 const settings = {
                     system_prompt: this.systemPromptInput.value,
                     max_tokens: parseInt(this.maxTokensInput.value) || 4096,
@@ -680,6 +677,9 @@
                 if (thinkingBudget) {
                     settings.thinking_budget = thinkingBudget;
                 }
+                
+                // Add user message to UI AFTER preparing settings
+                this.addMessage('user', message);
                 
                 try {
                     const reader = await this.api.sendMessage(message, settings);
@@ -702,9 +702,10 @@
                 let isThinking = false;
                 let messageWrapper = null;
                 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
                     
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
@@ -749,6 +750,12 @@
                                         }
                                     }
                                 }
+                                // Cancel the reader before returning
+                                try {
+                                    await reader.cancel();
+                                } catch (e) {
+                                    // Reader might already be cancelled
+                                }
                                 return;
                             } else if (event === 'error') {
                                 // Error will be in next data line
@@ -792,6 +799,14 @@
                                 }
                             }
                         }
+                    }
+                }
+                } finally {
+                    // Always try to cancel the reader when done
+                    try {
+                        await reader.cancel();
+                    } catch (e) {
+                        // Reader might already be cancelled
                     }
                 }
             }
